@@ -46,9 +46,6 @@ class MyModel(tf.keras.Model):
         self.bn3 = tf.keras.layers.BatchNormalization(
             gamma_regularizer=tf.keras.regularizers.l1(l1_factor), name="bn3")
 
-        self.tmp_flatten = None
-        self.tmp_dense3 = None
-
     def call(self, inputs):
         x = inputs
 
@@ -69,12 +66,7 @@ class MyModel(tf.keras.Model):
 
         x = tf.keras.layers.Flatten()(x)
 
-        self.tmp_flatten = x
-
         x = self.dense3(x)
-
-        self.tmp_dense3 = x
-        
         x = self.bn3(x)
         x = tf.keras.layers.Activation("relu")(x)
 
