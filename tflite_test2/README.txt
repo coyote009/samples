@@ -1,0 +1,2 @@
+Tensorflow Hub (Kaggle)からダウンロードした.tfliteファイル（メタデータなし）を読み込んで推論実行し、枠を出力するサンプル
+Google提供のEfficientDetとSSD-Mobilenetで動作を確認
