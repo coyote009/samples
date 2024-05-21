@@ -80,7 +80,7 @@ pytz==2022.1
 pyxdg==0.27
 PyYAML==5.4.1
 reportlab==3.6.8
-requests==2.25.1
+requests==2.32.0
 rich==13.7.1
 screen-resolution-extra==0.0.0
 SecretStorage==3.3.1
