@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import cv2
 from picamera2 import Picamera2
@@ -18,9 +19,10 @@ def calibrate(img_points, board_size, img_size, mat_cam=None, vec_dist=None,
 
     return rms_err, mat_cam, vec_dist
 
-def calib_intrinsic(camera, img_size, board_size, fname_calib,
+def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
                     mat_cam=None, vec_dist=None, flags=None):
-
+    rms_err = None
+    
     corner_points = []
     while True:
         img = camera.capture_array()
@@ -70,8 +72,18 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib,
                 calibrate(img_points, board_size, img_size, mat_cam, vec_dist,
                           flags)
 
-            np.savez(fname_calib, rms_err=rms_err, mat_cam=mat_cam,
-                     vec_dist=vec_dist)
+            if fname_calib is not None:
+                ext = os.path.splitext(fname_calib)[1]
+                print(ext)
+                if ext == ".npz":
+                    np.savez(fname_calib, rms_err=rms_err, mat_cam=mat_cam,
+                             vec_dist=vec_dist)
+                elif ext == ".yml":
+                    fs = cv2.FileStorage(fname_calib, cv2.FileStorage_WRITE)
+                    fs.write("MAT_CAM", mat_cam)
+                    fs.write("VEC_DIST", vec_dist)
+                    fs.write("RMS_ERR", rms_err)
+                    fs.release()
 
             print(f"RMS error = {rms_err}")
             print(f"Mat Cam = {mat_cam}")
@@ -80,6 +92,8 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib,
 
         elif key == 27:
             break
+
+    return mat_cam, vec_dist, rms_err
 
 if __name__ == "__main__":
     camera = Picamera2()
