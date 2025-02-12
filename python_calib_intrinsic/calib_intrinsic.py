@@ -20,9 +20,13 @@ def calibrate(img_points, board_size, img_size, mat_cam=None, vec_dist=None,
     return rms_err, mat_cam, vec_dist
 
 def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
-                    mat_cam=None, vec_dist=None, flags=None):
+                    mat_cam=None, vec_dist=None, flags=None,
+                    img_file_prefix=None):
     rms_err = None
     
+    if img_file_prefix is not None:
+        board_imgs = []
+        
     corner_points = []
     while True:
         img = camera.capture_array()
@@ -61,6 +65,8 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
                 key = cv2.waitKey()
                 if key == ord("y"):
                     corner_points += [np.squeeze(corners)]
+                    if img_file_prefix is not None:
+                        board_imgs += [img]
 
         elif key == ord("c"):
             if len(corner_points) == 0:
@@ -88,6 +94,11 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
             print(f"RMS error = {rms_err}")
             print(f"Mat Cam = {mat_cam}")
             print(f"Vec Dist = {vec_dist}")
+
+            if img_file_prefix is not None:
+                for i, img in enumerate(board_imgs):
+                    fname_img = img_file_prefix + f"_{i:02d}.png"
+                    cv2.imwrite(fname_img, img)
             break
 
         elif key == 27:
