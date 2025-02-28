@@ -21,10 +21,29 @@ def calibrate(img_points, board_size, img_size, mat_cam=None, vec_dist=None,
 
 def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
                     mat_cam=None, vec_dist=None, flags=None,
-                    img_file_prefix=None):
+                    file_prefix=None, do_calibration=True):
+    """
+    Intrinsic calibration helper function
+    
+    Procudure:
+      1. Press space when you take the image
+      2. Program asks if you use this image; then answer 'y' or else
+      3. After enough images are captured press 'c' to calibrate
+
+    if do_calibration:
+      calibration is done
+      if fname_calib is not None:
+        calibration results are saved to file
+      if file_prefix is not None:
+        images and corner coordinates are saved to file
+    else:
+      calibration is not done
+      if file_prefix is not None:
+        images and corner coordinates are saved to file
+    """
     rms_err = None
     
-    if img_file_prefix is not None:
+    if file_prefix is not None:
         board_imgs = []
         
     corner_points = []
@@ -65,7 +84,7 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
                 key = cv2.waitKey()
                 if key == ord("y"):
                     corner_points += [np.squeeze(corners)]
-                    if img_file_prefix is not None:
+                    if file_prefix is not None:
                         board_imgs += [img]
 
         elif key == ord("c"):
@@ -74,31 +93,34 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
 
             img_points = np.array(corner_points)
 
-            rms_err, mat_cam, vec_dist = \
-                calibrate(img_points, board_size, img_size, mat_cam, vec_dist,
-                          flags)
+            if do_calibration:
+                rms_err, mat_cam, vec_dist = \
+                    calibrate(img_points, board_size, img_size, mat_cam, vec_dist,
+                              flags)
 
-            if fname_calib is not None:
-                ext = os.path.splitext(fname_calib)[1]
-                print(ext)
-                if ext == ".npz":
-                    np.savez(fname_calib, rms_err=rms_err, mat_cam=mat_cam,
-                             vec_dist=vec_dist)
-                elif ext == ".yml":
-                    fs = cv2.FileStorage(fname_calib, cv2.FileStorage_WRITE)
-                    fs.write("MAT_CAM", mat_cam)
-                    fs.write("VEC_DIST", vec_dist)
-                    fs.write("RMS_ERR", rms_err)
-                    fs.release()
+                if fname_calib is not None:
+                    ext = os.path.splitext(fname_calib)[1]
+                    print(ext)
+                    if ext == ".npz":
+                        np.savez(fname_calib, rms_err=rms_err, mat_cam=mat_cam,
+                                 vec_dist=vec_dist)
+                    elif ext == ".yml":
+                        fs = cv2.FileStorage(fname_calib, cv2.FileStorage_WRITE)
+                        fs.write("MAT_CAM", mat_cam)
+                        fs.write("VEC_DIST", vec_dist)
+                        fs.write("RMS_ERR", rms_err)
+                        fs.release()
 
-            print(f"RMS error = {rms_err}")
-            print(f"Mat Cam = {mat_cam}")
-            print(f"Vec Dist = {vec_dist}")
+                print(f"RMS error = {rms_err}")
+                print(f"Mat Cam = {mat_cam}")
+                print(f"Vec Dist = {vec_dist}")
 
-            if img_file_prefix is not None:
+            if file_prefix is not None:
                 for i, img in enumerate(board_imgs):
-                    fname_img = img_file_prefix + f"_{i:02d}.png"
+                    fname_img = file_prefix + f"_img{i:02d}.png"
                     cv2.imwrite(fname_img, img)
+
+                np.savez(file_prefix + "_img_points.npy", img_points)
             break
 
         elif key == 27:
