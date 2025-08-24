@@ -51,36 +51,32 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
         img = camera.capture_array()
 
         img_show = img.copy()
-        cv2.putText(img_show, f"{len(corner_points)}", (15, 15),
+        cv2.putText(img_show, f"{len(corner_points)} images taken.", (15, 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+        cv2.putText(img_show, "Press space to take image.", (15, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+        cv2.putText(img_show, "Press 'c' to calibrate.", (15, 45),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
         cv2.imshow("img", img_show)
 
         key = cv2.waitKey(1)
         if key == ord(" "):
 
-            found = False
-            while not found:
-                img = camera.capture_array()
-                img_show = img.copy()
-                img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-                found, corners = cv2.findChessboardCorners(img_gray, board_size)
-                if found:
-                    corners = cv2.cornerSubPix(img_gray, corners, (11, 11), (-1, -1),
-                                               (cv2.TERM_CRITERIA_EPS +
-                                                cv2.TERM_CRITERIA_MAX_ITER,
-                                                30, 0.1))
-
-                    cv2.drawChessboardCorners(img_show, board_size, corners, found)
-
-                cv2.imshow("img", img_show)
-                if cv2.waitKey(1) == 27:
-                    break
-
+            found, corners = cv2.findChessboardCorners(img_gray, board_size)
             if found:
+                corners = cv2.cornerSubPix(img_gray, corners, (11, 11), (-1, -1),
+                                           (cv2.TERM_CRITERIA_EPS +
+                                            cv2.TERM_CRITERIA_MAX_ITER,
+                                            30, 0.1))
+
+                img_show = img.copy()
+                cv2.drawChessboardCorners(img_show, board_size, corners, found)
                 cv2.putText(img_show, "Use this image (y)?", (15, 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
                 cv2.imshow("img", img_show)
+
                 key = cv2.waitKey()
                 if key == ord("y"):
                     corner_points += [np.squeeze(corners)]
@@ -129,13 +125,14 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
     return mat_cam, vec_dist, rms_err
 
 if __name__ == "__main__":
+    img_size = (640, 480)
+    board_size = (6, 5)
+    fname_calib = "calib.npz"
+
     camera = Picamera2()
     camera.configure(camera.create_preview_configuration(main={"format": "RGB888",
                                                                "size": img_size}))
     camera.start()
 
-    img_size = (640, 480)
-    board_size = (6, 5)
-    fname_calib = "calib.npz"
     calib_intrinsic(camera, img_size, board_size, fname_calib)
 
