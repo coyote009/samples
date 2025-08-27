@@ -1,10 +1,41 @@
 import os
+import argparse
 import numpy as np
 import cv2
 from picamera2 import Picamera2
 
-def calibrate(img_points, board_size, img_size, mat_cam=None, vec_dist=None,
-              flags=None):
+class CalibParam:
+    def __init__(self, fname_config):
+        if fname_config is None:
+            self.init_mat_cam = None
+            self.init_vec_dist = None
+            self.flags = 0
+            return
+
+        fs = cv2.FileStorage(fname_config, cv2.FileStorage_READ)
+        self.init_mat_cam = fs.getNode("INIT_MAT_CAM").mat()
+        self.init_vec_dist = fs.getNode("INIT_VEC_DIST").mat()
+        self.flags = 0
+        self.flags += int(fs.getNode("USE_INTRINSIC_GUESS").real())     * 0x00001
+        self.flags += int(fs.getNode("USE_FIX_ASPECT_RATIO").real())    * 0x00002
+        self.flags += int(fs.getNode("USE_FIX_PRINCIPAL_POINT").real()) * 0x00004
+        self.flags += int(fs.getNode("ZERO_TANGENT_DIST").real())       * 0x00008
+        self.flags += int(fs.getNode("FIX_FOCAL_LENGTH").real())        * 0x00010
+        self.flags += int(fs.getNode("FIX_K1").real())                  * 0x00020
+        self.flags += int(fs.getNode("FIX_K2").real())                  * 0x00040
+        self.flags += int(fs.getNode("FIX_K3").real())                  * 0x00080
+        self.flags += int(fs.getNode("FIX_K4").real())                  * 0x00800
+        self.flags += int(fs.getNode("FIX_K5").real())                  * 0x01000
+        self.flags += int(fs.getNode("FIX_K6").real())                  * 0x02000
+        self.flags += int(fs.getNode("RATIONAL_MODEL").real())          * 0x04000
+        self.flags += int(fs.getNode("THIN_PRISM_MODEL").real())        * 0x08000
+        self.flags += int(fs.getNode("FIX_S1_S2_S3_S4").real())         * 0x10000
+        self.flags += int(fs.getNode("TILTED_MODEL").real())            * 0x40000
+        self.flags += int(fs.getNode("FIX_TAUX_TAUY").real())           * 0x80000
+        self.flags += int(fs.getNode("FIX_TANGENT_DIST").real())       * 0x200000
+        fs.release()
+
+def calibrate(img_points, board_size, img_size, calib_param=None):
 
     obj_points = np.zeros((board_size[0]*board_size[1], 3), dtype=np.float32)
     obj_points[:, :2] = np.mgrid[0:board_size[0],
@@ -15,12 +46,15 @@ def calibrate(img_points, board_size, img_size, mat_cam=None, vec_dist=None,
         mat_cam, vec_dist, \
         rvecs, tvecs = \
             cv2.calibrateCamera(obj_points, img_points, img_size,
-                                mat_cam, vec_dist, flags=flags)
+                                calib_param.init_mat_cam,
+                                calib_param.init_vec_dist,
+                                flags=calib_param.flags)
+
+    print(calib_param.flags)
 
     return rms_err, mat_cam, vec_dist
 
-def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
-                    mat_cam=None, vec_dist=None, flags=None,
+def calib_intrinsic(camera, img_size, board_size, fname_calib=None, fname_config=None,
                     file_prefix=None, do_calibration=True):
     """
     Intrinsic calibration helper function
@@ -90,9 +124,10 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
             img_points = np.array(corner_points)
 
             if do_calibration:
+                calib_param = CalibParam(fname_config)
+
                 rms_err, mat_cam, vec_dist = \
-                    calibrate(img_points, board_size, img_size, mat_cam, vec_dist,
-                              flags)
+                    calibrate(img_points, board_size, img_size, calib_param)
 
                 if fname_calib is not None:
                     ext = os.path.splitext(fname_calib)[1]
@@ -113,10 +148,10 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
 
             if file_prefix is not None:
                 for i, img in enumerate(board_imgs):
-                    fname_img = file_prefix + f"_img{i:02d}.png"
+                    fname_img = file_prefix + f"_img{i:02d}.jpg"
                     cv2.imwrite(fname_img, img)
 
-                np.savez(file_prefix + "_img_points.npy", img_points)
+                np.savez(file_prefix + "_img_points", img_points)
             break
 
         elif key == 27:
@@ -125,14 +160,33 @@ def calib_intrinsic(camera, img_size, board_size, fname_calib=None,
     return mat_cam, vec_dist, rms_err
 
 if __name__ == "__main__":
-    img_size = (640, 480)
-    board_size = (6, 5)
-    fname_calib = "calib.npz"
+
+    parser = argparse.ArgumentParser(description="Camera calibration software")
+    parser.add_argument("--width", type=int, default=640)
+    parser.add_argument("--height", type=int, default=480)
+    parser.add_argument("--corners_h", type=int, default=6)
+    parser.add_argument("--corners_v", type=int, default=5)
+    parser.add_argument("--dname_results", type=str, default="results")
+    parser.add_argument("--fname_calib", type=str, default="calib.yml")
+    parser.add_argument("--fname_config", type=str, default="config.yml")
+    parser.add_argument("--out_prefix", type=str, default="out")
+
+    args = parser.parse_args()
+    
+    img_size = (args.width, args.height)
+    board_size = (args.corners_h, args.corners_v)
+    dname_results = args.dname_results
+    fname_calib = os.path.join(dname_results, args.fname_calib)
+    out_file_prefix = os.path.join(dname_results, args.out_prefix)
+    fname_config = args.fname_config
+
+    os.makedirs(dname_results, exist_ok=True)
 
     camera = Picamera2()
     camera.configure(camera.create_preview_configuration(main={"format": "RGB888",
                                                                "size": img_size}))
     camera.start()
-
-    calib_intrinsic(camera, img_size, board_size, fname_calib)
+    
+    calib_intrinsic(camera, img_size, board_size, fname_calib, fname_config,
+                    out_file_prefix)
 
